@@ -42,15 +42,15 @@ jobs:
         echo "=== Build completed ==="
 
         # Copy with KMI-specific naming
-        mkdir -p /github/workspace/out
+        mkdir -p ${{ github.workspace }}/out
         OUTPUT_NAME="${{ inputs.kmi }}_nohello.kpm"
-        cp nohello.kpm "/github/workspace/out/$OUTPUT_NAME"
+        cp nohello.kpm "${{ github.workspace }}/out/$OUTPUT_NAME"
 
-        echo "Copied to: /github/workspace/out/$OUTPUT_NAME"
-        ls -la "/github/workspace/out/$OUTPUT_NAME"
+        echo "Copied to: ${{ github.workspace }}/out/$OUTPUT_NAME"
+        ls -la "${{ github.workspace }}/out/$OUTPUT_NAME"
 
     - name: Upload nohello.kpm artifact
       uses: actions/upload-artifact@v7
       with:
         name: ${{ inputs.kmi }}-kpm
-        path: /github/workspace/out/${{ inputs.kmi }}_nohello.kpm
+        path: ${{ github.workspace }}/out/${{ inputs.kmi }}_nohello.kpm
