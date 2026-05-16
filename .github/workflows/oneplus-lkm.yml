@@ -50,20 +50,37 @@ jobs:
         export SUBARCH=arm64
         
         # 使用 OnePlus 的默认配置
-        # 先查找可用的配置文件
         echo "=== Available kernel configs ==="
-        find arch/arm64/configs -name "*oneplus*" -o -name "*sm8650*" 2>/dev/null || true
-        ls arch/arm64/configs/ | head -20
+        ls arch/arm64/configs/ | head -30
         
-        # 尝试使用 gki_defconfig 或 vendor 配置
-        if [ -f arch/arm64/configs/vendor/lahaina-qgki_defconfig ]; then
-          make vendor/lahaina-qgki_defconfig
-        elif [ -f arch/arm64/configs/vendor/qgki_defconfig ]; then
-          make vendor/qgki_defconfig
-        elif [ -f arch/arm64/configs/gki_defconfig ]; then
-          make gki_defconfig
-        else
-          # 使用默认配置
+        # 检查 vendor 目录
+        if [ -d arch/arm64/configs/vendor ]; then
+          echo "=== Vendor configs ==="
+          ls arch/arm64/configs/vendor/ | head -20
+        fi
+        
+        # 尝试不同的配置文件
+        CONFIG_FOUND=0
+        
+        # 尝试 vendor 配置
+        for config in \
+          "vendor/lahaina-qgki_defconfig" \
+          "vendor/qgki_defconfig" \
+          "vendor/sm8650_defconfig" \
+          "vendor/oneplus_sm8650_defconfig" \
+          "gki_defconfig" \
+          "defconfig"; do
+          if [ -f "arch/arm64/configs/$config" ]; then
+            echo "=== Using config: $config ==="
+            make $config
+            CONFIG_FOUND=1
+            break
+          fi
+        done
+        
+        # 如果没有找到配置，使用 defconfig
+        if [ $CONFIG_FOUND -eq 0 ]; then
+          echo "=== No specific config found, using defconfig ==="
           make defconfig
         fi
         
