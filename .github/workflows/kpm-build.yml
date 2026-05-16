@@ -1,0 +1,56 @@
+name: Build KernelPatch Module (KPM)
+
+on:
+  workflow_call:
+    inputs:
+      kmi:
+        description: 'KMI version'
+        required: true
+        type: string
+
+jobs:
+  build-nohello-kpm:
+    name: Build nohello.kpm for ${{ inputs.kmi }}
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout source code
+      uses: actions/checkout@v6
+
+    - name: Install aarch64 toolchain
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gcc-aarch64-linux-gnu
+
+    - name: Clone KernelPatch
+      run: |
+        git clone https://github.com/bmax121/KernelPatch.git
+        cd KernelPatch
+        git checkout main
+
+    - name: Build nohello.kpm
+      run: |
+        cd kpm
+
+        echo "=== Building nohello.kpm for KMI: ${{ inputs.kmi }} ==="
+
+        export TARGET_COMPILE=aarch64-linux-gnu-
+        export KP_DIR=../KernelPatch
+
+        make
+
+        echo "=== Build completed ==="
+
+        # Copy with KMI-specific naming
+        mkdir -p /github/workspace/out
+        OUTPUT_NAME="${{ inputs.kmi }}_nohello.kpm"
+        cp nohello.kpm "/github/workspace/out/$OUTPUT_NAME"
+
+        echo "Copied to: /github/workspace/out/$OUTPUT_NAME"
+        ls -la "/github/workspace/out/$OUTPUT_NAME"
+
+    - name: Upload nohello.kpm artifact
+      uses: actions/upload-artifact@v7
+      with:
+        name: ${{ inputs.kmi }}-kpm
+        path: /github/workspace/out/${{ inputs.kmi }}_nohello.kpm

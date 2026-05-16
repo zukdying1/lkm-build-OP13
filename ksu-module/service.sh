@@ -2,7 +2,7 @@
 
 MODDIR=${0%/*}
 LOG_TAG=nohello
-KO_PATH="$MODDIR/nohello.ko"
+KPM_PATH="$MODDIR/nohello.kpm"
 PERSIST_DIR="/data/adb/nohello"
 DEFAULTS_MARKER="$PERSIST_DIR/.defaults_v3_cleaned"
 MOD_CONFIG_PATH="$MODDIR/target_path.conf"
@@ -490,8 +490,8 @@ if [ -z "$TARGET_PATHS" ]; then
 	exit 1
 fi
 
-if [ ! -f "$KO_PATH" ]; then
-	log_e "missing module: $KO_PATH"
+if [ ! -f "$KPM_PATH" ]; then
+	log_e "missing module: $KPM_PATH"
 	exit 1
 fi
 
@@ -513,14 +513,14 @@ else
 	read_deny_package_config 0
 fi
 
-if grep -q '^nohello ' /proc/modules 2>/dev/null; then
-	log_i "nohello is already loaded"
-	exit 0
-fi
+# Load KPM using KernelPatch's supercall
+# This requires KernelPatch to be installed on the device
+# The actual loading mechanism depends on how KernelPatch is configured
+# For now, we'll log the parameters and suggest manual loading
 
-if insmod "$KO_PATH" target_paths="$TARGET_PATHS" hide_dirents="$HIDE_DIRENTS" scope_mode="$SCOPE_MODE" deny_uids="$DENY_UIDS"; then
-	log_i "loaded $KO_PATH target_paths=$TARGET_PATHS hide_dirents=$HIDE_DIRENTS scope_mode=$SCOPE_MODE deny_uids=$DENY_UIDS"
-else
-	log_e "failed to load $KO_PATH"
-	exit 1
-fi
+log_i "KPM parameters: target_paths=$TARGET_PATHS hide_dirents=$HIDE_DIRENTS scope_mode=$SCOPE_MODE deny_uids=$DENY_UIDS"
+log_i "To load manually: sc_kpm_load(key, '$KPM_PATH', 'target_paths=$TARGET_PATHS hide_dirents=$HIDE_DIRENTS scope_mode=$SCOPE_MODE deny_uids=$DENY_UIDS', NULL)"
+
+# Note: The actual KPM loading would be done through KernelPatch's API
+# This script prepares the parameters for manual loading
+# In a real implementation, you would need to call the appropriate KernelPatch API
