@@ -1,0 +1,156 @@
+name: Build LKM for OnePlus SM8650
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-oneplus-lkm:
+    name: Build nohello.ko for OnePlus SM8650
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout source code
+      uses: actions/checkout@v6
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          git \
+          build-essential \
+          bc \
+          bison \
+          flex \
+          libssl-dev \
+          gcc-aarch64-linux-gnu \
+          clang \
+          lld
+
+    - name: Clone OnePlus SM8650 kernel source
+      run: |
+        echo "=== Cloning OnePlus SM8650 kernel source ==="
+        git clone --depth=1 \
+          -b oneplus/sm8650_b_16.0.0_ace_3_pro \
+          https://github.com/OnePlusOSS/android_kernel_oneplus_sm8650.git \
+          oneplus-kernel
+        echo "=== Clone completed ==="
+        ls -la oneplus-kernel/
+
+    - name: Setup kernel configuration
+      run: |
+        cd oneplus-kernel
+        
+        # 设置交叉编译工具链
+        export ARCH=arm64
+        export CROSS_COMPILE=aarch64-linux-gnu-
+        export SUBARCH=arm64
+        
+        # 使用 OnePlus 的默认配置
+        # 先查找可用的配置文件
+        echo "=== Available kernel configs ==="
+        find arch/arm64/configs -name "*oneplus*" -o -name "*sm8650*" 2>/dev/null || true
+        ls arch/arm64/configs/ | head -20
+        
+        # 尝试使用 gki_defconfig 或 vendor 配置
+        if [ -f arch/arm64/configs/vendor/lahaina-qgki_defconfig ]; then
+          make vendor/lahaina-qgki_defconfig
+        elif [ -f arch/arm64/configs/vendor/qgki_defconfig ]; then
+          make vendor/qgki_defconfig
+        elif [ -f arch/arm64/configs/gki_defconfig ]; then
+          make gki_defconfig
+        else
+          # 使用默认配置
+          make defconfig
+        fi
+        
+        echo "=== Kernel config setup completed ==="
+
+    - name: Build kernel headers
+      run: |
+        cd oneplus-kernel
+        
+        export ARCH=arm64
+        export CROSS_COMPILE=aarch64-linux-gnu-
+        export SUBARCH=arm64
+        
+        echo "=== Building kernel headers ==="
+        
+        # 准备内核头文件
+        make scripts
+        make prepare
+        
+        echo "=== Kernel headers prepared ==="
+
+    - name: Build nohello.ko module
+      run: |
+        cd oneplus-kernel
+        
+        export ARCH=arm64
+        export CROSS_COMPILE=aarch64-linux-gnu-
+        export SUBARCH=arm64
+        
+        echo "=== Building nohello.ko ==="
+        
+        # 复制模块源码到内核树
+        mkdir -p drivers/misc/nohello
+        cp ${GITHUB_WORKSPACE}/kernel/nohello.c drivers/misc/nohello/
+        
+        # 创建 Kbuild 文件
+        cat > drivers/misc/nohello/Kbuild << 'EOF'
+        obj-m += nohello.o
+        EOF
+        
+        # 创建 Makefile
+        cat > drivers/misc/nohello/Makefile << 'EOF'
+        KDIR ?= ../../../..
+        
+        all:
+        	$(MAKE) -C $(KDIR) M=$(PWD) modules
+        
+        clean:
+        	$(MAKE) -C $(KDIR) M=$(PWD) clean
+        EOF
+        
+        # 编译模块
+        make M=drivers/misc/nohello modules
+        
+        echo "=== Build completed ==="
+        
+        # 复制编译好的模块
+        mkdir -p ${GITHUB_WORKSPACE}/out
+        cp drivers/misc/nohello/nohello.ko ${GITHUB_WORKSPACE}/out/
+        
+        echo "=== Module copied ==="
+        ls -la ${GITHUB_WORKSPACE}/out/nohello.ko
+
+    - name: Strip debug symbols
+      run: |
+        cd ${GITHUB_WORKSPACE}/out
+        
+        echo "=== Stripping debug symbols ==="
+        
+        # 使用 aarch64 版本的 strip
+        aarch64-linux-gnu-strip -d nohello.ko
+        
+        echo "=== Stripped ==="
+        ls -la nohello.ko
+        echo "Size: $(du -h nohello.ko | cut -f1)"
+
+    - name: Upload nohello.ko artifact
+      uses: actions/upload-artifact@v7
+      with:
+        name: oneplus-sm8650-lkm
+        path: ${{ github.workspace }}/out/nohello.ko
+
+    - name: Build summary
+      if: always()
+      run: |
+        echo "=== Build Summary ==="
+        echo "Device: OnePlus Ace 3 Pro (SM8650)"
+        echo "Kernel: 6.1.x (Android 14)"
+        echo "Module: nohello.ko"
+        echo "========================="
