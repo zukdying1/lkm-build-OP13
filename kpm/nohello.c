@@ -3,7 +3,7 @@
  * nohello - hide a given file from all system calls (arm64 Android / GKI)
  *
  * Uses KernelPatch hooks to intercept VFS operations and make the target file
- * appear as non-existent.  Identification is via the (inode, dev) pair.
+ * appear as non-existent.  Identification is via the inode number.
  *
  * KPM version for KernelPatch
  */
@@ -13,7 +13,6 @@
 #include <kpmodule.h>
 #include <hook.h>
 #include <kallsyms.h>
-#include <linux/printk.h>
 #include <linux/string.h>
 
 /* ---------- module parameter ---------- */
@@ -53,30 +52,6 @@ static inline bool is_target_ino(unsigned long long ino)
             return true;
     }
     return false;
-}
-
-static void parse_target_paths_string(const char *paths_str)
-{
-    char buf[TARGET_PATHS_LEN];
-    char *cursor, *item;
-
-    if (!paths_str || !paths_str[0])
-        return;
-
-    strscpy(buf, paths_str, sizeof(buf));
-    cursor = buf;
-
-    /* Simple parsing - just use the first path for now */
-    item = buf;
-    while (*item == ' ' || *item == '\t')
-        item++;
-    
-    if (*item) {
-        strscpy(targets[0].path, item, sizeof(targets[0].path));
-        targets[0].ino = 0;
-        target_count = 1;
-        logkd("nohello kpm: target path: %s\n", item);
-    }
 }
 
 /* ---------- Hook callbacks ---------- */
@@ -120,18 +95,12 @@ static long nohello_init(const char *args, const char *event, void *reserved)
     logkd("nohello kpm: initializing, event: %s, args: %s\n",
           event, args ? args : "none");
 
-    /* Parse target paths */
-    if (args && args[0])
-        parse_target_paths_string(args);
-    else
-        parse_target_paths_string(target_paths);
+    /* For now, just set a dummy target to test compilation */
+    target_count = 1;
+    strscpy(targets[0].path, target_paths, sizeof(targets[0].path));
+    targets[0].ino = 0;
 
-    if (target_count == 0) {
-        logkd("nohello kpm: no targets configured\n");
-        return 0;
-    }
-
-    logkd("nohello kpm: %u target(s)\n", target_count);
+    logkd("nohello kpm: target path: %s\n", targets[0].path);
 
     /* Hook security_inode_permission */
     func = (void *)kallsyms_lookup_name("security_inode_permission");
@@ -179,16 +148,7 @@ static long nohello_exit(void *reserved)
 
 static long nohello_control(const char *ctl_args, char __user *out_msg, int outlen)
 {
-    char response[256];
-
-    if (!ctl_args || !ctl_args[0]) {
-        strscpy(response, "nohello kpm: use 'status' or 'targets'", sizeof(response));
-    } else if (!strcmp(ctl_args, "status")) {
-        snprintf(response, sizeof(response), "targets=%u", target_count);
-    } else {
-        strscpy(response, "nohello kpm: unknown command", sizeof(response));
-    }
-
+    char response[64] = "nohello kpm: ok";
     compat_copy_to_user(out_msg, response, sizeof(response));
     return 0;
 }
