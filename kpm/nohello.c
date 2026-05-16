@@ -27,6 +27,12 @@ static char target_path[TARGET_PATH_LEN] = "/data/local/tmp/nohello";
 static void *hooked_inode_permission = NULL;
 static void *hooked_inode_getattr = NULL;
 
+static void inode_perm_before(hook_fargs2_t *fargs, void *udata)
+{
+    struct inode *inode = (struct inode *)fargs->arg0;
+    logkd("nohello kpm: inode_permission called\n");
+}
+
 static void inode_getattr_before(hook_fargs2_t *fargs, void *udata)
 {
     struct path *p = (struct path *)fargs->arg0;
@@ -54,6 +60,17 @@ static long nohello_init(const char *args, const char *event, void *reserved)
 
     logkd("nohello kpm: init, target: %s\n", target_path);
 
+    func = (void *)kallsyms_lookup_name("security_inode_permission");
+    if (func) {
+        err = hook_wrap2(func, inode_perm_before, 0, 0);
+        if (err) {
+            logkd("nohello kpm: hook security_inode_permission failed: %d\n", err);
+        } else {
+            hooked_inode_permission = func;
+            logkd("nohello kpm: hooked security_inode_permission\n");
+        }
+    }
+
     func = (void *)kallsyms_lookup_name("security_inode_getattr");
     if (func) {
         err = hook_wrap2(func, inode_getattr_before, 0, 0);
@@ -70,6 +87,10 @@ static long nohello_init(const char *args, const char *event, void *reserved)
 
 static long nohello_exit(void *reserved)
 {
+    if (hooked_inode_permission) {
+        unhook(hooked_inode_permission);
+        hooked_inode_permission = NULL;
+    }
     if (hooked_inode_getattr) {
         unhook(hooked_inode_getattr);
         hooked_inode_getattr = NULL;
