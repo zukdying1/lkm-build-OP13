@@ -51,12 +51,22 @@ jobs:
         
         # 列出所有可用的配置
         echo "=== Available kernel configs ==="
-        find . -name "*defconfig" -o -name "*config" | grep -E "(arm64|vendor)" | head -30
+        ls -la arch/arm64/configs/
         
-        # 检查 OnePlus 特定的配置脚本
-        if [ -f "build.config" ]; then
-          echo "=== Found build.config ==="
-          cat build.config
+        # 检查 vendor 目录
+        if [ -d "arch/arm64/configs/vendor" ]; then
+          echo "=== Vendor configs ==="
+          ls -la arch/arm64/configs/vendor/
+        fi
+        
+        # 检查 OnePlus 特定的配置
+        echo "=== Checking for OnePlus configs ==="
+        find . -name "*oneplus*" -o -name "*sm8650*" | head -20
+        
+        # 检查 build.sh 或其他编译脚本
+        if [ -f "build.sh" ]; then
+          echo "=== Found build.sh ==="
+          head -50 build.sh
         fi
         
         # 检查 kernel_platform 目录
@@ -65,19 +75,9 @@ jobs:
           ls -la kernel_platform/
         fi
         
-        # 尝试使用 merge_config.sh 或 defconfig
-        if [ -f "scripts/kconfig/merge_config.sh" ]; then
-          echo "=== Using merge_config.sh ==="
-          # 使用基础配置
-          if [ -f "arch/arm64/configs/gki_defconfig" ]; then
-            scripts/kconfig/merge_config.sh arch/arm64/configs/gki_defconfig
-          else
-            make defconfig
-          fi
-        else
-          echo "=== Using defconfig ==="
-          make defconfig
-        fi
+        # 使用 defconfig
+        echo "=== Using defconfig ==="
+        make defconfig
         
         echo "=== Kernel config setup completed ==="
 
