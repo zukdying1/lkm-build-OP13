@@ -49,38 +49,33 @@ jobs:
         export CROSS_COMPILE=aarch64-linux-gnu-
         export SUBARCH=arm64
         
-        # 使用 OnePlus 的默认配置
+        # 列出所有可用的配置
         echo "=== Available kernel configs ==="
-        ls arch/arm64/configs/ | head -30
+        find . -name "*defconfig" -o -name "*config" | grep -E "(arm64|vendor)" | head -30
         
-        # 检查 vendor 目录
-        if [ -d arch/arm64/configs/vendor ]; then
-          echo "=== Vendor configs ==="
-          ls arch/arm64/configs/vendor/ | head -20
+        # 检查 OnePlus 特定的配置脚本
+        if [ -f "build.config" ]; then
+          echo "=== Found build.config ==="
+          cat build.config
         fi
         
-        # 尝试不同的配置文件
-        CONFIG_FOUND=0
+        # 检查 kernel_platform 目录
+        if [ -d "kernel_platform" ]; then
+          echo "=== Found kernel_platform ==="
+          ls -la kernel_platform/
+        fi
         
-        # 尝试 vendor 配置
-        for config in \
-          "vendor/lahaina-qgki_defconfig" \
-          "vendor/qgki_defconfig" \
-          "vendor/sm8650_defconfig" \
-          "vendor/oneplus_sm8650_defconfig" \
-          "gki_defconfig" \
-          "defconfig"; do
-          if [ -f "arch/arm64/configs/$config" ]; then
-            echo "=== Using config: $config ==="
-            make $config
-            CONFIG_FOUND=1
-            break
+        # 尝试使用 merge_config.sh 或 defconfig
+        if [ -f "scripts/kconfig/merge_config.sh" ]; then
+          echo "=== Using merge_config.sh ==="
+          # 使用基础配置
+          if [ -f "arch/arm64/configs/gki_defconfig" ]; then
+            scripts/kconfig/merge_config.sh arch/arm64/configs/gki_defconfig
+          else
+            make defconfig
           fi
-        done
-        
-        # 如果没有找到配置，使用 defconfig
-        if [ $CONFIG_FOUND -eq 0 ]; then
-          echo "=== No specific config found, using defconfig ==="
+        else
+          echo "=== Using defconfig ==="
           make defconfig
         fi
         
